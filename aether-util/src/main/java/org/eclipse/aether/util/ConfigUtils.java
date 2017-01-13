@@ -178,14 +178,16 @@ public final class ConfigUtils
             {
                 return ( (Number) value ).longValue();
             }
-
-            try
+            else if ( value instanceof String )
             {
-                return Long.valueOf( (String) value );
-            }
-            catch ( Exception e )
-            {
-                // try next key
+                try
+                {
+                    return Long.valueOf( (String) value );
+                }
+                catch ( Exception e )
+                {
+                    // try next key
+                }
             }
         }
 
@@ -226,14 +228,16 @@ public final class ConfigUtils
             {
                 return ( (Number) value ).floatValue();
             }
-
-            try
+            else if ( value instanceof String )
             {
-                return Float.valueOf( (String) value );
-            }
-            catch ( Exception e )
-            {
-                // try next key
+                try
+                {
+                    return Float.valueOf( (String) value );
+                }
+                catch ( Exception e )
+                {
+                    // try next key
+                }
             }
         }
 
