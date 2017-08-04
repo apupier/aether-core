@@ -11,10 +11,13 @@
 package org.eclipse.aether.spi.connector.transport;
 
 import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.eclipse.aether.transfer.TransferCancelledException;
@@ -25,7 +28,7 @@ import org.eclipse.aether.transfer.TransferCancelledException;
 public abstract class AbstractTransporter
     implements Transporter
 {
-
+    private static Set<String> downloadInProgress = new HashSet<String>();
     private final AtomicBoolean closed;
 
     /**
@@ -87,18 +90,39 @@ public abstract class AbstractTransporter
     protected void utilGet( GetTask task, InputStream is, boolean close, long length, boolean resume )
         throws IOException, TransferCancelledException
     {
+    	File dataFile = task.getDataFile();
         try
         {
-            task.getListener().transportStarted( resume ? task.getResumeOffset() : 0, length );
-            OutputStream os = task.newOutputStream( resume );
-            try
-            {
-                copy( os, is, task.getListener() );
-                os.close();
+            boolean isInprogressAlready = false;
+            synchronized(downloadInProgress) {
+                if(dataFile != null) {
+                    if(downloadInProgress.contains(dataFile.getAbsolutePath())) {
+                        isInprogressAlready = true;
+                    } else {
+                        downloadInProgress.add(dataFile.getAbsolutePath());
+                    }
+                }
             }
-            finally
-            {
-                close( os );
+            if(isInprogressAlready) {
+                while(downloadInProgress.contains(dataFile.getAbsolutePath())) {
+                    try {
+						Thread.currentThread().wait(100);
+					} catch (InterruptedException e) {
+						break;
+					}
+                }
+            } else {
+                task.getListener().transportStarted( resume ? task.getResumeOffset() : 0, length );
+                OutputStream os = task.newOutputStream( resume );
+                try
+                {
+                    copy( os, is, task.getListener() );
+                    os.close();
+                }
+                finally
+                {
+                    close( os );
+                }
             }
         }
         finally
@@ -106,6 +130,11 @@ public abstract class AbstractTransporter
             if ( close )
             {
                 close( is );
+            }
+            if(dataFile != null) {
+                synchronized(downloadInProgress) {
+                    downloadInProgress.remove(dataFile.getAbsolutePath());
+                }
             }
         }
     }
